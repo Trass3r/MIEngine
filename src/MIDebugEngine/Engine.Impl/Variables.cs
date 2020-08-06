@@ -207,30 +207,34 @@ namespace Microsoft.MIDebugEngine
                 _debuggedProcess.ActiveVariables.Add(this);
             }
         }
+
+        private static Regex ptypeRegex = new Regex(@"type = (const )?(class|struct|union|enum)?([^\[{]+)[^}]*\}?(.*)", RegexOptions.Singleline | RegexOptions.Compiled);
         public static async Task<string> resolveType(DebuggedProcess process, string type)
         {
             // avoid useless requests
             if (string.IsNullOrEmpty(type) || type.Contains("{...}"))
                 return type;
 
-            // support the common case of a single-level */&
-            char last = type[type.Length - 1];
-            string orgtype = type;
-            if (last == '*' || last == '&')
-                type = type.Substring(0, type.Length - 1);
             try
             {
-                // N.B.: whatis only strips 1 typedef level and fails when type is a * or &
-                type = await process.ConsoleCmdAsync("whatis " + type, false);
+                type = await process.ConsoleCmdAsync("ptype/mt " + type, false);
             }
             catch(UnexpectedMIResultException e)
             {
                 process.WriteOutput(e.ToString());
-                return orgtype;
+                return type;
             }
-            if (last == '*' || last == '&')
-                type += last;
-            return Regex.Match(type, "type = (.+)").Groups[1].Value;
+            process.WriteOutput(type);
+            var matches = ptypeRegex.Match(type);
+            string prefix = matches.Groups[1].Value;
+            string typename = matches.Groups[3].Value;
+            string tail = matches.Groups[4].Value;
+            int i = typename.IndexOf(" : ", StringComparison.InvariantCulture); // inheritance
+            if (i > 0)
+                typename = typename.Substring(0, i);
+
+            process.WriteOutput(prefix + typename + tail);
+            return prefix + typename + tail;
         }
 
         //this constructor is used to create root nodes (local/params)

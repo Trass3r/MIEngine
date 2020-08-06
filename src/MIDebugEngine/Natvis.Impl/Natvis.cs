@@ -71,7 +71,7 @@ namespace Microsoft.MIDebugEngine.Natvis
         }
     }
 
-    internal class VisualizerWrapper : SimpleWrapper
+    internal sealed class VisualizerWrapper : SimpleWrapper
     {
         public readonly Natvis.VisualizerInfo Visualizer;
         private bool _isVisualizerView;
