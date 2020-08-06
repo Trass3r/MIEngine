@@ -188,6 +188,31 @@ namespace Microsoft.MIDebugEngine
                 _debuggedProcess.ActiveVariables.Add(this);
             }
         }
+        public static async Task<string> resolveType(DebuggedProcess process, string type)
+        {
+            // avoid useless requests
+            if (string.IsNullOrEmpty(type) || type.Contains("{...}"))
+                return type;
+
+            // support the common case of a single-level */&
+            char last = type[type.Length - 1];
+            string orgtype = type;
+            if (last == '*' || last == '&')
+                type = type.Substring(0, type.Length - 1);
+            try
+            {
+                // N.B.: whatis only strips 1 typedef level and fails when type is a * or &
+                type = await process.ConsoleCmdAsync("whatis " + type, false);
+            }
+            catch(UnexpectedMIResultException e)
+            {
+                process.WriteOutput(e.ToString());
+                return orgtype;
+            }
+            if (last == '*' || last == '&')
+                type += last;
+            return Regex.Match(type, "type = (.+)").Groups[1].Value;
+        }
 
         //this constructor is used to create root nodes (local/params)
         internal VariableInformation(string expr, ThreadContext ctx, AD7Engine engine, AD7Thread thread, bool isParameter = false)
@@ -494,6 +519,7 @@ namespace Microsoft.MIDebugEngine
                     {
                         _internalName = results.FindString("name");
                         TypeName = results.TryFindString("type");
+                        TypeName = await VariableInformation.resolveType(_debuggedProcess, TypeName);
                         if (results.Contains("dynamic"))
                         {
                             IsPreformatted = true;
@@ -632,7 +658,9 @@ namespace Microsoft.MIDebugEngine
                     Children = new VariableInformation[CountChildren];
                     foreach (var c in children)
                     {
-                        Children[i] = new VariableInformation(c, this);
+                        var vi = new VariableInformation(c, this);
+                        vi.TypeName = await resolveType(_debuggedProcess, vi.TypeName);
+                        Children[i] = vi;
                         i++;
                     }
                 }
@@ -651,7 +679,9 @@ namespace Microsoft.MIDebugEngine
                             var variable = new VariableInformation("[" + (p / 2).ToString() + "]", this);
                             variable.CountChildren = 2;
                             var first = new VariableInformation(children[p], variable, "first");
+                            first.TypeName = await resolveType(_debuggedProcess, first.TypeName);
                             var second = new VariableInformation(children[p + 1], this, "second");
+                            second.TypeName = await resolveType(_debuggedProcess, second.TypeName);
 
                             variable.Children = new VariableInformation[] { first, second };
                             variable.TypeName = FormattableString.Invariant($"std::pair<{first.TypeName}, {second.TypeName}>");
@@ -664,6 +694,7 @@ namespace Microsoft.MIDebugEngine
                             // and the second element (p+1) becoming the value.
                             string name = children[p].TryFindString("value");
                             var variable = new VariableInformation(children[p + 1], this, '[' + name + ']');
+                            variable.TypeName = await resolveType(_debuggedProcess, variable.TypeName);
                             listChildren.Add(variable);
                         }
                     }
@@ -676,6 +707,7 @@ namespace Microsoft.MIDebugEngine
                     foreach (var c in children)
                     {
                         var variable = new VariableInformation(c, this);
+                        variable.TypeName = await resolveType(_debuggedProcess, variable.TypeName);
                         enum_DBG_ATTRIB_FLAGS access = enum_DBG_ATTRIB_FLAGS.DBG_ATTRIB_NONE;
                         if (variable.Name == "public")
                         {
