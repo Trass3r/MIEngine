@@ -25,7 +25,7 @@ namespace Microsoft.MIDebugEngine
         public AD7Engine Engine { get; private set; }
         public List<string> VariablesToDelete { get; private set; }
         public List<IVariableInformation> ActiveVariables { get; private set; }
-
+        public VariableInformation ReturnValue { get; private set; }
         public SourceLineCache SourceLineCache { get; private set; }
         public ThreadCache ThreadCache { get; private set; }
         public Disassembly Disassembly { get; private set; }
@@ -1053,6 +1053,7 @@ namespace Microsoft.MIDebugEngine
                     varInfo.Dispose();
                 }
                 this.ActiveVariables.Clear();
+                ReturnValue = null; // already disposed above
             }
 
             ThreadCache.MarkDirty();
@@ -1235,8 +1236,21 @@ namespace Microsoft.MIDebugEngine
                     }
                 }
             }
-            else if (reason == "end-stepping-range" || reason == "function-finished")
+            // step over/into
+            else if (reason == "end-stepping-range")
+                _callback.OnStepComplete(thread);
+            // step out
+            else if (reason == "function-finished")
             {
+                string resultVar = results.Results.TryFindString("gdb-result-var"); // a gdb value history var like "$1"
+                if (!string.IsNullOrEmpty(resultVar))
+                {
+                    ReturnValue = new VariableInformation(resultVar, cxt, Engine, (AD7Thread)thread.Client, isParameter: false)
+                    {
+                        Name = "Function return value"
+                    };
+                    await ReturnValue.Eval();
+                }
                 _callback.OnStepComplete(thread);
             }
             else if (reason == "signal-received")
@@ -1873,6 +1887,9 @@ namespace Microsoft.MIDebugEngine
                 VariableInformation vi = await simpleInfo.CreateMIDebuggerVariable(ctx, Engine, thread);
                 variables.Add(vi);
             }
+
+            if (ReturnValue != null)
+                variables.Add(ReturnValue);
 
             return variables;
         }
