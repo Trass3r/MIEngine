@@ -1646,6 +1646,12 @@ namespace Microsoft.MIDebugEngine
                         await MICommandFactory.ExecStep(threadId);
                         break;
                     case enum_STEPKIND.STEP_OVER:
+                        string line = await ConsoleCmdAsync("f", false, true);
+                        if (line.Contains("return "))
+                        {
+                            await MICommandFactory.ExecFinish(threadId);
+                            break;
+                        }
                         await MICommandFactory.ExecNext(threadId);
                         break;
                     case enum_STEPKIND.STEP_OUT:
