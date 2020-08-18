@@ -326,6 +326,11 @@ namespace OpenDebugAD7
                 {
                     m_breakCounter++;
                 }
+
+                // mark it as non-existing
+                if (textPosition.Source != null && !File.Exists(textPosition.Source.Path))
+                    textPosition.Source.PresentationHint = Source.PresentationHintValue.Deemphasize;
+
                 Protocol.SendEvent(new OpenDebugStoppedEvent()
                 {
                     Reason = reason,
@@ -1540,12 +1545,20 @@ namespace OpenDebugAD7
         }
 
         /// <summary>
-        /// Currently unsupported. This message can be received when we return a source file that doesn't exist (such as a library within gdb).
-        /// See github issue: microsoft/vscode-cpptools#3662
+        /// This message will only be received if a Source uses a sourceReference instead of filename
+        /// So use it for non-existing sources
         /// </summary>
         protected override void HandleSourceRequestAsync(IRequestResponder<SourceArguments, SourceResponse> responder)
         {
-            responder.SetError(new ProtocolException("'SourceRequest' not supported."));
+            //IDebugDisassemblyStream2 disasmStream;
+            //m_program.GetDisassemblyStream(enum_DISASSEMBLY_STREAM_SCOPE.DSS_FUNCTION, m_engine, out disasmStream);
+
+            if (responder.Arguments.Source != null)
+            {
+            }
+            var response = new SourceResponse();
+            responder.SetResponse(response);
+            //responder.SetError(new ProtocolException("'SourceRequest' not supported."));
         }
 
         protected override void HandleThreadsRequestAsync(IRequestResponder<ThreadsArguments, ThreadsResponse> responder)
