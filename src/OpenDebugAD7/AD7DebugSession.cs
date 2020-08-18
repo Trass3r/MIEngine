@@ -618,7 +618,8 @@ namespace OpenDebugAD7
                 SupportsConditionalBreakpoints = m_engineConfiguration.ConditionalBP,
                 ExceptionBreakpointFilters = m_engineConfiguration.ExceptionSettings.ExceptionBreakpointFilters.Select(item => new ExceptionBreakpointsFilter() { Default = item.@default, Filter = item.filter, Label = item.label }).ToList(),
                 SupportsClipboardContext = m_engineConfiguration.ClipboardContext,
-                SupportsLogPoints = true
+                SupportsLogPoints = true,
+                SupportsStepInTargetsRequest = true
             };
 
             responder.SetResponse(initializeResponse);
@@ -1153,6 +1154,23 @@ namespace OpenDebugAD7
         {
             StepInResponse response = new StepInResponse();
 
+            try
+            {
+                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_INTO, enum_STEPUNIT.STEP_STATEMENT, AD7Resources.Error_Scenario_Step_In);
+                responder.SetResponse(response);
+            }
+            catch (AD7Exception e)
+            {
+                if (m_isCoreDump)
+                {
+                    responder.SetError(new ProtocolException(e.Message));
+                }
+            }
+        }
+
+        protected override void HandleStepInTargetsRequestAsync(IRequestResponder<StepInTargetsArguments, StepInTargetsResponse> responder)
+        {
+            var response = new StepInTargetsResponse();
             try
             {
                 StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_INTO, enum_STEPUNIT.STEP_STATEMENT, AD7Resources.Error_Scenario_Step_In);
