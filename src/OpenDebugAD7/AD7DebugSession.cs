@@ -66,6 +66,7 @@ namespace OpenDebugAD7
         private VariableManager m_variableManager;
 
         private static Guid s_guidFilterAllLocalsPlusArgs = new Guid("939729a8-4cb0-4647-9831-7ff465240d5f");
+        private static Guid s_guidFilterRegisters = new Guid("223ae797-bd09-4f28-8241-2763bdc5f713");
 
         #region Constructor
 
@@ -472,19 +473,33 @@ namespace OpenDebugAD7
             m_logger.WriteLine(category, prefixString + text);
         }
 
-        private VariablesResponse VariablesFromFrame(IDebugStackFrame2 frame)
+        private VariablesResponse VariablesFromFrame(VariablesRef vref)
         {
-            VariablesResponse response = new VariablesResponse();
+            var frame = vref.StackFrame;
+            var scope = vref.Scope;
+
+            var response = new VariablesResponse();
+
+            Guid filter = Guid.Empty;
+            switch (scope)
+            {
+            case VariablesScope.Locals:
+                filter = s_guidFilterAllLocalsPlusArgs;
+                break;
+            case VariablesScope.Registers:
+                filter = s_guidFilterRegisters;
+                break;
+            }
 
             uint n;
             IEnumDebugPropertyInfo2 varEnum;
-            if (frame.EnumProperties(enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_PROP, 10, ref s_guidFilterAllLocalsPlusArgs, 0, out n, out varEnum) == HRConstants.S_OK)
+            if (frame.EnumProperties(GetDefaultPropertyInfoFlags(), 10, ref filter, 0, out n, out varEnum) == HRConstants.S_OK)
             {
-                DEBUG_PROPERTY_INFO[] props = new DEBUG_PROPERTY_INFO[1];
+                var props = new DEBUG_PROPERTY_INFO[1];
                 uint nProps;
                 while (varEnum.Next(1, props, out nProps) == HRConstants.S_OK)
                 {
-                    response.Variables.Add(m_variableManager.CreateVariable(props[0].pProperty, GetDefaultPropertyInfoFlags()));
+                    response.Variables.Add(m_variableManager.CreateVariable(ref props[0], GetDefaultPropertyInfoFlags()));
                 }
             }
 
@@ -494,10 +509,7 @@ namespace OpenDebugAD7
         public enum_DEBUGPROP_INFO_FLAGS GetDefaultPropertyInfoFlags()
         {
             enum_DEBUGPROP_INFO_FLAGS flags =
-                enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_NAME |
-                enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_VALUE |
-                enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_TYPE |
-                enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_ATTRIB |
+                enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_STANDARD |
                 enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_PROP |
                 enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_FULLNAME |
                 (enum_DEBUGPROP_INFO_FLAGS)enum_DEBUGPROP_INFO_FLAGS110.DEBUGPROP110_INFO_FORCE_REAL_FUNCEVAL;
@@ -1318,8 +1330,23 @@ namespace OpenDebugAD7
                         response.Scopes.Add(new Scope()
                         {
                             Name = AD7Resources.Locals_Scope_Name,
-                            VariablesReference = m_variableManager.Create(frame),
+                            VariablesReference = m_variableManager.Create(new VariablesRef() { StackFrame = frame, Scope = VariablesScope.Locals }),
+                            PresentationHint = Scope.PresentationHintValue.Locals,
                             Expensive = false
+                        });
+                    }
+                }
+
+                if (frame.EnumProperties(enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_PROP, 10, ref s_guidFilterRegisters, 0, out n, out varEnum) == HRConstants.S_OK)
+                {
+                    if (n > 0)
+                    {
+                        response.Scopes.Add(new Scope()
+                        {
+                            Name = AD7Resources.Registers_Scope_Name,
+                            VariablesReference = m_variableManager.Create(new VariablesRef() { StackFrame = frame, Scope = VariablesScope.Registers }),
+                            PresentationHint = Scope.PresentationHintValue.Registers,
+                            Expensive = true
                         });
                     }
                 }
@@ -1343,9 +1370,9 @@ namespace OpenDebugAD7
             Object container;
             if (m_variableManager.TryGet(reference, out container))
             {
-                if (container is IDebugStackFrame2)
+                if (container is VariablesRef)
                 {
-                    response = VariablesFromFrame(container as IDebugStackFrame2);
+                    response = VariablesFromFrame(container as VariablesRef);
                 }
                 else
                 {
@@ -1368,7 +1395,7 @@ namespace OpenDebugAD7
                                 if (count > 1)
                                 {
                                     // Ensure that items with duplicate names such as multiple anonymous unions will display in VS Code
-                                    Dictionary<string, Variable> variablesDictionary = new Dictionary<string, Variable>();
+                                    var variablesDictionary = new Dictionary<string, Variable>();
                                     for (uint c = 0; c < count; c++)
                                     {
                                         var variable = m_variableManager.CreateVariable(ref childProperties[c], variableEvaluationData.propertyInfoFlags);
