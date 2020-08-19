@@ -1553,13 +1553,15 @@ namespace OpenDebugAD7
         /// </summary>
         protected override void HandleSourceRequestAsync(IRequestResponder<SourceArguments, SourceResponse> responder)
         {
-            //IDebugDisassemblyStream2 disasmStream;
-            //m_program.GetDisassemblyStream(enum_DISASSEMBLY_STREAM_SCOPE.DSS_FUNCTION, m_engine, out disasmStream);
-
-            if (responder.Arguments.Source != null)
-            {
-            }
+            var source = responder.Arguments.Source;
             var response = new SourceResponse();
+            if (source != null)
+            {
+                int sourceRef = (int)source.SourceReference;
+                string content = TextPositionTuple.GetSourceForRef(sourceRef);
+                response.MimeType = "text/x-asm";
+                response.Content = content;
+            }
             responder.SetResponse(response);
             //responder.SetError(new ProtocolException("'SourceRequest' not supported."));
         }
