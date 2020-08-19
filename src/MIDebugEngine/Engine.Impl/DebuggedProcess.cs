@@ -641,6 +641,7 @@ namespace Microsoft.MIDebugEngine
             if (_launchOptions.DebuggerMIMode == MIMode.Gdb)
             {
                 commands.Add(new LaunchCommand("-interpreter-exec console \"set pagination off\""));
+                commands.Add(new LaunchCommand("-interpreter-exec console \"set disassembly-flavor intel\""));
             }
 
             // When user specifies loading directives then the debugger cannot auto load symbols, the MIEngine must intervene at each solib-load event and make a determination
