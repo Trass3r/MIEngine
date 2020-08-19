@@ -44,6 +44,13 @@ namespace OpenDebugAD7
                 int line = converter.ConvertDebuggerLineToClient((int)beginPosition[0].dwLine);
                 int column = unchecked((int)(beginPosition[0].dwColumn + 1));
 
+                if (!File.Exists(convertedFilePath))
+                {
+                    // mark this frame as lacking source code
+                    // it will be skipped by the UI but can still be manually switched to
+                    source.PresentationHint = Source.PresentationHintValue.Deemphasize;
+                }
+
                 return new TextPositionTuple(source, line, column);
             }
 

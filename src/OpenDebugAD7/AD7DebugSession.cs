@@ -327,13 +327,6 @@ namespace OpenDebugAD7
                     m_breakCounter++;
                 }
 
-                if (textPosition.Source != null && !File.Exists(textPosition.Source.Path))
-                {
-                    textPosition.Source.Path = null;
-                    textPosition.Source.Origin = "disassembly";
-                    textPosition.Source.SourceReference = 1;
-                }
-
                 Protocol.SendEvent(new OpenDebugStoppedEvent()
                 {
                     Reason = reason,
