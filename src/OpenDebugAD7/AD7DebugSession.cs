@@ -1342,19 +1342,15 @@ namespace OpenDebugAD7
                     }
                 }
 
-                if (frame.EnumProperties(enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_PROP, 10, ref s_guidFilterRegisters, 0, out n, out varEnum) == HRConstants.S_OK)
+                // registers should always be present
+                // and it's too expensive to read all values just to add the scope
+                response.Scopes.Add(new Scope()
                 {
-                    if (n > 0)
-                    {
-                        response.Scopes.Add(new Scope()
-                        {
-                            Name = AD7Resources.Registers_Scope_Name,
-                            VariablesReference = m_variableManager.Create(new VariablesRef() { StackFrame = frame, Scope = VariablesScope.Registers }),
-                            PresentationHint = Scope.PresentationHintValue.Registers,
-                            Expensive = true
-                        });
-                    }
-                }
+                    Name = AD7Resources.Registers_Scope_Name,
+                    VariablesReference = m_variableManager.Create(new VariablesRef() { StackFrame = frame, Scope = VariablesScope.Registers }),
+                    PresentationHint = Scope.PresentationHintValue.Registers,
+                    Expensive = true
+                });
             }
 
             responder.SetResponse(response);
