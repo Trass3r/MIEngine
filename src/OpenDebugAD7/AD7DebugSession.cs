@@ -327,9 +327,12 @@ namespace OpenDebugAD7
                     m_breakCounter++;
                 }
 
-                // mark it as non-existing
                 if (textPosition.Source != null && !File.Exists(textPosition.Source.Path))
-                    textPosition.Source.PresentationHint = Source.PresentationHintValue.Deemphasize;
+                {
+                    textPosition.Source.Path = null;
+                    textPosition.Source.Origin = "disassembly";
+                    textPosition.Source.SourceReference = 1;
+                }
 
                 Protocol.SendEvent(new OpenDebugStoppedEvent()
                 {
