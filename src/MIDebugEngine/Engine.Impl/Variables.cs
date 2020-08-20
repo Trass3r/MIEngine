@@ -546,7 +546,7 @@ namespace Microsoft.MIDebugEngine
                     }
                     else if (results.ResultClass == ResultClass.error)
                     {
-                        SetAsError(results.FindString("msg"));
+                        SetAsError("ERROR: " + _strippedName + " => " + results.FindString("msg")); // TODO: does msg ever contain anything useful?
                     }
                     else
                     {
