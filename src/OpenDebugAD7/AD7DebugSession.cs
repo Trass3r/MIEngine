@@ -1381,57 +1381,54 @@ namespace OpenDebugAD7
                 {
                     response = VariablesFromFrame(container as VariablesRef);
                 }
-                else
+                else if (container is VariableEvaluationData)
                 {
-                    if (container is VariableEvaluationData)
+                    var variableEvaluationData = (VariableEvaluationData)container;
+                    IDebugProperty2 property = variableEvaluationData.DebugProperty;
+
+                    Guid empty = Guid.Empty;
+                    IEnumDebugPropertyInfo2 childEnum;
+                    if (property.EnumChildren(variableEvaluationData.propertyInfoFlags, Constants.EvaluationRadix, ref empty, enum_DBG_ATTRIB_FLAGS.DBG_ATTRIB_ALL, null, Constants.EvaluationTimeout, out childEnum) == 0)
                     {
-                        VariableEvaluationData variableEvaluationData = (VariableEvaluationData)container;
-                        IDebugProperty2 property = variableEvaluationData.DebugProperty;
-
-                        Guid empty = Guid.Empty;
-                        IEnumDebugPropertyInfo2 childEnum;
-                        if (property.EnumChildren(variableEvaluationData.propertyInfoFlags, Constants.EvaluationRadix, ref empty, enum_DBG_ATTRIB_FLAGS.DBG_ATTRIB_ALL, null, Constants.EvaluationTimeout, out childEnum) == 0)
+                        uint count;
+                        childEnum.GetCount(out count);
+                        if (count > 0)
                         {
-                            uint count;
-                            childEnum.GetCount(out count);
-                            if (count > 0)
+                            var childProperties = new DEBUG_PROPERTY_INFO[count];
+                            childEnum.Next(count, childProperties, out count);
+
+                            if (count > 1)
                             {
-                                DEBUG_PROPERTY_INFO[] childProperties = new DEBUG_PROPERTY_INFO[count];
-                                childEnum.Next(count, childProperties, out count);
-
-                                if (count > 1)
+                                // Ensure that items with duplicate names such as multiple anonymous unions will display in VS Code
+                                var variablesDictionary = new Dictionary<string, Variable>();
+                                for (uint c = 0; c < count; c++)
                                 {
-                                    // Ensure that items with duplicate names such as multiple anonymous unions will display in VS Code
-                                    var variablesDictionary = new Dictionary<string, Variable>();
-                                    for (uint c = 0; c < count; c++)
+                                    var variable = m_variableManager.CreateVariable(ref childProperties[c], variableEvaluationData.propertyInfoFlags);
+                                    int uniqueCounter = 2;
+                                    string variableName = variable.Name;
+                                    string variableNameFormat = "{0} #{1}";
+                                    while (variablesDictionary.ContainsKey(variableName))
                                     {
-                                        var variable = m_variableManager.CreateVariable(ref childProperties[c], variableEvaluationData.propertyInfoFlags);
-                                        int uniqueCounter = 2;
-                                        string variableName = variable.Name;
-                                        string variableNameFormat = "{0} #{1}";
-                                        while (variablesDictionary.ContainsKey(variableName))
-                                        {
-                                            variableName = String.Format(CultureInfo.InvariantCulture, variableNameFormat, variable.Name, uniqueCounter++);
-                                        }
-
-                                        variable.Name = variableName;
-                                        variablesDictionary[variableName] = variable;
+                                        variableName = String.Format(CultureInfo.InvariantCulture, variableNameFormat, variable.Name, uniqueCounter++);
                                     }
 
-                                    response.Variables.AddRange(variablesDictionary.Values);
+                                    variable.Name = variableName;
+                                    variablesDictionary[variableName] = variable;
                                 }
-                                else
-                                {
-                                    // Shortcut when no duplicate can exist
-                                    response.Variables.Add(m_variableManager.CreateVariable(ref childProperties[0], variableEvaluationData.propertyInfoFlags));
-                                }
+
+                                response.Variables.AddRange(variablesDictionary.Values);
+                            }
+                            else
+                            {
+                                // Shortcut when no duplicate can exist
+                                response.Variables.Add(m_variableManager.CreateVariable(ref childProperties[0], variableEvaluationData.propertyInfoFlags));
                             }
                         }
                     }
-                    else
-                    {
-                        Debug.Assert(false, "Unexpected type in _variableHandles collection");
-                    }
+                }
+                else
+                {
+                    Debug.Assert(false, "Unexpected type in _variableHandles collection");
                 }
             }
 
@@ -1505,13 +1502,12 @@ namespace OpenDebugAD7
 
             if (hr == HRConstants.S_OK && varEnum != null)
             {
-                DEBUG_PROPERTY_INFO[] props = new DEBUG_PROPERTY_INFO[1];
+                var props = new DEBUG_PROPERTY_INFO[1];
                 uint nProps;
                 while (varEnum.Next(1, props, out nProps) == HRConstants.S_OK)
                 {
-                    DEBUG_PROPERTY_INFO[] propertyInfo = new DEBUG_PROPERTY_INFO[1];
+                    var propertyInfo = new DEBUG_PROPERTY_INFO[1];
                     props[0].pProperty.GetPropertyInfo(flags, Constants.EvaluationRadix, Constants.EvaluationTimeout, null, 0, propertyInfo);
-
                     if (propertyInfo[0].bstrName == name)
                     {
                         // Make sure we can assign to this variable.
