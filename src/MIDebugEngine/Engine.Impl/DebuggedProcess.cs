@@ -619,6 +619,11 @@ namespace Microsoft.MIDebugEngine
             {
                 commands.Add(new LaunchCommand("-interpreter-exec console \"set pagination off\""));
                 commands.Add(new LaunchCommand("-interpreter-exec console \"set disassembly-flavor intel\""));
+                commands.Add(new LaunchCommand("-list-features", successResultsHandler: res => {
+                    Features = res.FindAllStrings("result");
+                    Engine.Logger.WriteLine(string.Join(", ", Features));
+                    return Task.FromResult(0);
+                }));
             }
 
             // When user specifies loading directives then the debugger cannot auto load symbols, the MIEngine must intervene at each solib-load event and make a determination
@@ -2170,6 +2175,8 @@ namespace Microsoft.MIDebugEngine
         }
 
         public bool IsChildProcessDebugging => _childProcessHandler != null;
+
+        public string[] Features { get; private set; }
 
         public bool MapCurrentSrcToCompileTimeSrc(string currentSrc, out string compilerSrc)
         {
