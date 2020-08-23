@@ -29,7 +29,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Desktop.Debug|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
+    <DebugType>portable</DebugType>
     <Optimize>false</Optimize>
     <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -37,7 +37,8 @@
     <Externalconsole>true</Externalconsole>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Desktop.Release|AnyCPU'">
-    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
     <Optimize>true</Optimize>
     <DefineConstants>$(DefineConstants);TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -173,7 +174,7 @@
     <DropUnsignedFile Include="$(OutputPath)\OpenDebugAD7.exe.config" />
     <DropUnsignedFile Include="$(OutputPath)\Newtonsoft.Json.dll" />
     <DropUnsignedFile Include="$(OutputPath)\Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.dll" />
-    <DropUnsignedFile Condition="'$(IsXPlat)' == 'true'" Include="$(OutputPath)\OpenDebugAD7.exe.mdb" />
+    <DropUnsignedFile Include="$(OutputPath)\OpenDebugAD7.pdb" />
   </ItemGroup>
   <ItemGroup Condition="'$(IsXPlat)' == 'false'">
     <DropUnsignedFile Include="$(OutputPath)\Microsoft.VisualStudio.Debugger.InteropA.dll" />
@@ -183,12 +184,6 @@
     <DropUnsignedFile Include="$(OutputPath)\Microsoft.VisualStudio.Debugger.Interop.15.0.dll" />
     <DropUnsignedFile Include="$(OutputPath)\cppdbg.ad7Engine.json" />
   </ItemGroup>
-  <!-- Necessary because IsMonoRuntime isn't set until after DetermineCompilerBinary is run. -->
-  <Target Name="GetDropFiles" AfterTargets="DetermineCompilerBinary" BeforeTargets="DropFiles">
-    <ItemGroup>
-      <DropUnsignedFile Condition="'$(IsMonoRuntime)' == 'false'" Include="$(OutputPath)\OpenDebugAD7.pdb" />
-    </ItemGroup>
-  </Target>
   <ItemGroup>
     <None Include="App.VSCode.config" />
     <None Include="App.VS.config" />
