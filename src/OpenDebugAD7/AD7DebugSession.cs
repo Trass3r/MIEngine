@@ -1565,7 +1565,7 @@ namespace OpenDebugAD7
             {
                 int sourceRef = (int)source.SourceReference;
                 string content = TextPositionTuple.GetSourceForRef(sourceRef);
-                response.MimeType = "text/x-asm";
+                response.MimeType = "text/x-lldb.disassembly";
                 response.Content = content;
             }
             responder.SetResponse(response);
