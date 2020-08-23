@@ -1296,14 +1296,18 @@ namespace OpenDebugAD7
 
                         m_currentFrameHasSourceCode = textPosition.Source?.Path != null;
 
-                        response.StackFrames.Add(new ProtocolMessages.StackFrame()
+                        var newframe = new ProtocolMessages.StackFrame()
                         {
                             Id = frameReference,
                             Name = frameInfo.m_bstrFuncName,
                             Source = textPosition.Source,
                             Line = textPosition.Line,
-                            Column = textPosition.Column
-                        });
+                            Column = textPosition.Column,
+                            
+                        };
+                        if (!m_currentFrameHasSourceCode)
+                            newframe.PresentationHint = ProtocolMessages.StackFrame.PresentationHintValue.Subtle;
+                        response.StackFrames.Add(newframe);
                     }
 
                     response.TotalFrames = (int)frameEnumInfo.TotalFrames;
