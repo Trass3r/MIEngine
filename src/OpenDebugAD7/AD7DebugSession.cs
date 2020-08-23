@@ -454,6 +454,7 @@ namespace OpenDebugAD7
         }
 
         private CurrentLaunchState m_currentLaunchState;
+        private bool m_currentFrameHasSourceCode;
 
         private void SendMessageEvent(MessagePrefix prefix, string text)
         {
@@ -538,29 +539,32 @@ namespace OpenDebugAD7
         private void StepInternal(int threadId, enum_STEPKIND stepKind, enum_STEPUNIT stepUnit, string errorMessage)
         {
             // If we are already running ignore additional step requests
-            if (m_isStopped)
-            {
-                IDebugThread2 thread = null;
-                lock (m_threads)
-                {
-                    if (!m_threads.TryGetValue(threadId, out thread))
-                    {
-                        throw new AD7Exception(errorMessage);
-                    }
-                }
+            if (!m_isStopped)
+                return;
 
-                BeforeContinue();
-                ErrorBuilder builder = new ErrorBuilder(() => errorMessage);
-                m_isStepping = true;
-                try
+
+            IDebugThread2 thread = null;
+            lock (m_threads)
+            {
+                if (!m_threads.TryGetValue(threadId, out thread))
                 {
-                    builder.CheckHR(m_program.Step(thread, stepKind, stepUnit));
+                    throw new AD7Exception(errorMessage);
                 }
-                catch (AD7Exception)
-                {
-                    m_isStopped = true;
-                    throw;
-                }
+            }
+
+            BeforeContinue();
+            ErrorBuilder builder = new ErrorBuilder(() => errorMessage);
+            m_isStepping = true;
+            if (!m_currentFrameHasSourceCode)
+                stepUnit = enum_STEPUNIT.STEP_INSTRUCTION;
+            try
+            {
+                builder.CheckHR(m_program.Step(thread, stepKind, stepUnit));
+            }
+            catch (AD7Exception)
+            {
+                m_isStopped = true;
+                throw;
             }
         }
 
@@ -1212,7 +1216,7 @@ namespace OpenDebugAD7
             int startFrame = responder.Arguments.StartFrame.GetValueOrDefault(0);
             int levels = responder.Arguments.Levels.GetValueOrDefault(0);
 
-            StackTraceResponse response = new StackTraceResponse()
+            var response = new StackTraceResponse()
             {
                 TotalFrames = 0
             };
@@ -1270,7 +1274,7 @@ namespace OpenDebugAD7
                         levels = Math.Min((int)frameEnumInfo.TotalFrames - startFrame, levels);
                     }
 
-                    FRAMEINFO[] frameInfoArray = new FRAMEINFO[levels];
+                    var frameInfoArray = new FRAMEINFO[levels];
                     uint framesFetched = 0;
                     frameEnumInfo.FrameEnum.Next((uint)frameInfoArray.Length, frameInfoArray, ref framesFetched);
                     frameEnumInfo.CurrentPosition += framesFetched;
@@ -1289,6 +1293,8 @@ namespace OpenDebugAD7
                             frameReference = m_frameHandles.Create(frame);
                             textPosition = TextPositionTuple.GetTextPositionOfFrame(m_pathConverter, frame) ?? TextPositionTuple.Nil;
                         }
+
+                        m_currentFrameHasSourceCode = textPosition.Source?.Path != null;
 
                         response.StackFrames.Add(new ProtocolMessages.StackFrame()
                         {
