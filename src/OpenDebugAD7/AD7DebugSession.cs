@@ -28,6 +28,18 @@ using static System.FormattableString;
 
 namespace OpenDebugAD7
 {
+    // not in the DAP dll yet
+    internal sealed class CapabilitiesEvent : DebugEvent
+    {
+        internal CapabilitiesEvent()
+            : base("capabilities")
+        {
+        }
+
+        [JsonProperty("capabilities")]
+        internal InitializeResponse Capabilities;
+    }
+
     internal class AD7DebugSession : DebugAdapterBase, IDebugPortNotify2, IDebugEventCallback2
     {
         // This is a general purpose lock. Don't hold it across long operations.
@@ -537,12 +549,11 @@ namespace OpenDebugAD7
             }
         }
 
-        private void StepInternal(int threadId, enum_STEPKIND stepKind, enum_STEPUNIT stepUnit, string errorMessage)
+        private void StepInternal(int threadId, enum_STEPKIND stepKind, SteppingGranularity granularity, ExecuteDirection stepDirection, string errorMessage)
         {
             // If we are already running ignore additional step requests
             if (!m_isStopped)
                 return;
-
 
             IDebugThread2 thread = null;
             lock (m_threads)
@@ -556,10 +567,25 @@ namespace OpenDebugAD7
             BeforeContinue();
             ErrorBuilder builder = new ErrorBuilder(() => errorMessage);
             m_isStepping = true;
+
+            enum_STEPUNIT stepUnit = enum_STEPUNIT.STEP_STATEMENT;
+            switch (granularity)
+            {
+                case SteppingGranularity.Statement:
+                default:
+                    break;
+                case SteppingGranularity.Line:
+                    stepUnit = enum_STEPUNIT.STEP_LINE;
+                    break;
+                case SteppingGranularity.Instruction:
+                    stepUnit = enum_STEPUNIT.STEP_INSTRUCTION;
+                    break;
+            }
             if (!m_currentFrameHasSourceCode)
                 stepUnit = enum_STEPUNIT.STEP_INSTRUCTION;
             try
             {
+                ((IDebugReversibleEngineProgram160)m_engine).SetExecuteDirection(stepDirection);
                 builder.CheckHR(m_program.Step(thread, stepKind, stepUnit));
             }
             catch (AD7Exception)
@@ -639,6 +665,7 @@ namespace OpenDebugAD7
                 SupportsClipboardContext = m_engineConfiguration.ClipboardContext,
                 SupportsLogPoints = true,
                 SupportsModulesRequest = true,
+                SupportsSteppingGranularity = true,
             };
 
             responder.SetResponse(initializeResponse);
@@ -783,6 +810,8 @@ namespace OpenDebugAD7
 
                     eb.ThrowHR(hr);
                 }
+
+                Protocol.SendEvent(new CapabilitiesEvent() { Capabilities = new InitializeResponse() { SupportsStepBack = ((IDebugReversibleEngineProgram160)m_engine).CanReverse() == HRConstants.S_OK } });
 
                 hr = m_engineLaunch.ResumeProcess(m_process);
                 if (hr < 0)
@@ -1011,6 +1040,8 @@ namespace OpenDebugAD7
                     eb.ThrowHR(hr);
                 }
 
+                Protocol.SendEvent(new CapabilitiesEvent() { Capabilities = new InitializeResponse() { SupportsStepBack = ((IDebugReversibleEngineProgram160)m_engine).CanReverse() == HRConstants.S_OK } });
+
                 hr = m_engineLaunch.ResumeProcess(m_process);
                 if (hr < 0)
                 {
@@ -1122,23 +1153,8 @@ namespace OpenDebugAD7
             responder.SetResponse(new ConfigurationDoneResponse());
         }
 
-        protected override void HandleNextRequestAsync(IRequestResponder<NextArguments> responder)
+        private void ContinueInternal(int threadId, ExecuteDirection direction)
         {
-            try
-            {
-                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_OVER, enum_STEPUNIT.STEP_STATEMENT, AD7Resources.Error_Scenario_Step_Next);
-                responder.SetResponse(new NextResponse());
-            }
-            catch (AD7Exception e)
-            {
-                responder.SetError(new ProtocolException(e.Message));
-            }
-        }
-
-        protected override void HandleContinueRequestAsync(IRequestResponder<ContinueArguments, ContinueResponse> responder)
-        {
-            int threadId = responder.Arguments.ThreadId;
-
             // Sometimes we can get a threadId of 0. Make sure we don't look it up in this case, otherwise we will crash.
             IDebugThread2 thread = null;
             lock (m_threads)
@@ -1157,13 +1173,9 @@ namespace OpenDebugAD7
             bool succeeded = false;
             try
             {
+                ((IDebugReversibleEngineProgram160)m_engine).SetExecuteDirection(direction);
                 builder.CheckHR(m_program.Continue(thread));
                 succeeded = true;
-                responder.SetResponse(new ContinueResponse());
-            }
-            catch (AD7Exception e)
-            {
-                responder.SetError(new ProtocolException(e.Message));
             }
             finally
             {
@@ -1174,14 +1186,40 @@ namespace OpenDebugAD7
             }
         }
 
-        protected override void HandleStepInRequestAsync(IRequestResponder<StepInArguments> responder)
+        protected override void HandleContinueRequestAsync(IRequestResponder<ContinueArguments, ContinueResponse> responder)
         {
-            StepInResponse response = new StepInResponse();
-
             try
             {
-                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_INTO, enum_STEPUNIT.STEP_STATEMENT, AD7Resources.Error_Scenario_Step_In);
-                responder.SetResponse(response);
+                ContinueInternal(responder.Arguments.ThreadId, ExecuteDirection.ExecuteDirection_Forward);
+                responder.SetResponse(new ContinueResponse());
+            }
+            catch (AD7Exception e)
+            {
+                responder.SetError(new ProtocolException(e.Message));
+            }
+           
+        }
+
+        protected override void HandleReverseContinueRequestAsync(IRequestResponder<ReverseContinueArguments> responder)
+        {
+            try
+            {
+                ContinueInternal(responder.Arguments.ThreadId, ExecuteDirection.ExecuteDirection_Reverse);
+                responder.SetResponse(new ContinueResponse());
+            }
+            catch (AD7Exception e)
+            {
+                responder.SetError(new ProtocolException(e.Message));
+            }
+        }
+
+        protected override void HandleStepInRequestAsync(IRequestResponder<StepInArguments> responder)
+        {
+            try
+            {
+                var granularity = responder.Arguments.Granularity.GetValueOrDefault();
+                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_INTO, granularity, ExecuteDirection.ExecuteDirection_Forward, AD7Resources.Error_Scenario_Step_In);
+                responder.SetResponse(new StepInResponse());
             }
             catch (AD7Exception e)
             {
@@ -1191,13 +1229,41 @@ namespace OpenDebugAD7
                 }
             }
         }
+        protected override void HandleNextRequestAsync(IRequestResponder<NextArguments> responder)
+        {
+            try
+            {
+                var granularity = responder.Arguments.Granularity.GetValueOrDefault();
+                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_OVER, granularity, ExecuteDirection.ExecuteDirection_Forward, AD7Resources.Error_Scenario_Step_Next);
+                responder.SetResponse(new NextResponse());
+            }
+            catch (AD7Exception e)
+            {
+                responder.SetError(new ProtocolException(e.Message));
+            }
+        }
 
         protected override void HandleStepOutRequestAsync(IRequestResponder<StepOutArguments> responder)
         {
             try
             {
-                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_OUT, enum_STEPUNIT.STEP_STATEMENT, AD7Resources.Error_Scenario_Step_Out);
+                var granularity = responder.Arguments.Granularity.GetValueOrDefault();
+                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_OUT, granularity, ExecuteDirection.ExecuteDirection_Forward, AD7Resources.Error_Scenario_Step_Out);
                 responder.SetResponse(new StepOutResponse());
+            }
+            catch (AD7Exception e)
+            {
+                responder.SetError(new ProtocolException(e.Message));
+            }
+        }
+
+        protected override void HandleStepBackRequestAsync(IRequestResponder<StepBackArguments> responder)
+        {
+            try
+            {
+                var granularity = responder.Arguments.Granularity.GetValueOrDefault();
+                StepInternal(responder.Arguments.ThreadId, enum_STEPKIND.STEP_OVER, granularity, ExecuteDirection.ExecuteDirection_Reverse, AD7Resources.Error_Scenario_Step_Next);
+                responder.SetResponse(new StepBackResponse());
             }
             catch (AD7Exception e)
             {

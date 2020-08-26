@@ -11,7 +11,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,6 +30,7 @@ namespace Microsoft.MIDebugEngine
         public Disassembly Disassembly { get; private set; }
         public ExceptionManager ExceptionManager { get; private set; }
         public CygwinFilePathMapper CygwinFilePathMapper { get; private set; }
+        public string[] TargetFeatures { get; private set; }
 
         private List<DebuggedModule> _moduleList;
         private ISampleEngineCallback _callback;
@@ -618,6 +618,8 @@ namespace Microsoft.MIDebugEngine
                         }
                     }
                 }
+                // now the exe is loaded and we can check target features
+                TargetFeatures = await MICommandFactory.GetTargetFeatures();
 
                 success = true;
             }
@@ -1617,9 +1619,15 @@ namespace Microsoft.MIDebugEngine
             _worker.PostOperation(() => { func(); });
         }
 
-        public async Task Execute(DebuggedThread thread)
+        public async Task Execute(DebuggedThread thread, ExecuteDirection executionDirection = ExecuteDirection.ExecuteDirection_Forward)
         {
             await ExceptionManager.EnsureSettingsUpdated();
+
+            if (executionDirection == ExecuteDirection.ExecuteDirection_Reverse)
+            {
+                await MICommandFactory.ExecContinue(false);
+                return;
+            }
 
             // Should clear stepping state
             if (_worker.IsPollThread())
@@ -1632,36 +1640,38 @@ namespace Microsoft.MIDebugEngine
             }
         }
 
-        public Task Continue(DebuggedThread thread)
+        public Task Continue(DebuggedThread thread, ExecuteDirection executionDirection = ExecuteDirection.ExecuteDirection_Forward)
         {
             // Called after Stopping event
-            return Execute(thread);
+            return Execute(thread, executionDirection);
         }
 
-        public async Task Step(int threadId, enum_STEPKIND kind, enum_STEPUNIT unit)
+        public async Task Step(int threadId, enum_STEPKIND kind, enum_STEPUNIT unit, ExecuteDirection direction = ExecuteDirection.ExecuteDirection_Forward)
         {
             this.VerifyNotDebuggingCoreDump();
 
             await ExceptionManager.EnsureSettingsUpdated();
 
+            // STEP_BACKWARDS is deprecated, use direction
+            bool isForwardStep = direction == ExecuteDirection.ExecuteDirection_Forward;
             if ((unit == enum_STEPUNIT.STEP_LINE) || (unit == enum_STEPUNIT.STEP_STATEMENT))
             {
                 switch (kind)
                 {
                     case enum_STEPKIND.STEP_INTO:
-                        await MICommandFactory.ExecStep(threadId);
+                        await MICommandFactory.ExecStep(threadId, isForwardStep);
                         break;
                     case enum_STEPKIND.STEP_OVER:
                         string line = await ConsoleCmdAsync("f", false, true);
                         if (line.Contains("return "))
                         {
-                            await MICommandFactory.ExecFinish(threadId);
+                            await MICommandFactory.ExecFinish(threadId, isForwardStep);
                             break;
                         }
-                        await MICommandFactory.ExecNext(threadId);
+                        await MICommandFactory.ExecNext(threadId, isForwardStep);
                         break;
                     case enum_STEPKIND.STEP_OUT:
-                        await MICommandFactory.ExecFinish(threadId);
+                        await MICommandFactory.ExecFinish(threadId, isForwardStep);
                         break;
                     default:
                         throw new NotImplementedException();
@@ -1672,13 +1682,13 @@ namespace Microsoft.MIDebugEngine
                 switch (kind)
                 {
                     case enum_STEPKIND.STEP_INTO:
-                        await MICommandFactory.ExecStepInstruction(threadId);
+                        await MICommandFactory.ExecStepInstruction(threadId, isForwardStep);
                         break;
                     case enum_STEPKIND.STEP_OVER:
-                        await MICommandFactory.ExecNextInstruction(threadId);
+                        await MICommandFactory.ExecNextInstruction(threadId, isForwardStep);
                         break;
                     case enum_STEPKIND.STEP_OUT:
-                        await MICommandFactory.ExecFinish(threadId);
+                        await MICommandFactory.ExecFinish(threadId, isForwardStep);
                         break;
                     default:
                         throw new NotImplementedException();

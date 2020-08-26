@@ -106,6 +106,10 @@
       <HintPath>$(NuGetPackagesDirectory)/Microsoft.VisualStudio.Debugger.Interop.15.0.15.8.28010/lib/net20/Microsoft.VisualStudio.Debugger.Interop.15.0.dll</HintPath>
       <ForceIncludeInVSIX>true</ForceIncludeInVSIX>
     </Reference>
+    <Reference Include="Microsoft.VisualStudio.Debugger.Interop.16.0">
+      <HintPath>$(NuGetPackagesDirectory)/Microsoft.VisualStudio.Debugger.Interop.16.0.16.7.30328.139/lib/net20/Microsoft.VisualStudio.Debugger.Interop.16.0.dll</HintPath>
+      <ForceIncludeInVSIX>true</ForceIncludeInVSIX>
+    </Reference>
     <!-- Same version as in packages.config -->
     <Reference Include="Microsoft.VisualStudio.Shared.VSCodeDebugProtocol">
       <HintPath>$(NuGetPackagesDirectory)/Microsoft.VisualStudio.Shared.VsCodeDebugProtocol.16.7.40526.2/lib/net45/Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.dll</HintPath>
