@@ -1296,7 +1296,9 @@ namespace OpenDebugAD7
                             textPosition = TextPositionTuple.GetTextPositionOfFrame(m_pathConverter, frame) ?? TextPositionTuple.Nil;
                         }
 
-                        m_currentFrameHasSourceCode = textPosition.Source?.Path != null;
+                        // remember the state for the lowermost frame
+                        if (startFrame == 0 && i == 0)
+                            m_currentFrameHasSourceCode = textPosition.Source?.Path != null;
 
                         var newframe = new ProtocolMessages.StackFrame()
                         {
