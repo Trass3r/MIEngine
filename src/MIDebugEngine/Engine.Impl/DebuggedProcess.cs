@@ -571,7 +571,6 @@ namespace Microsoft.MIDebugEngine
 
             try
             {
-                await this.MICommandFactory.EnableTargetAsyncOption();
                 List<LaunchCommand> commands = await GetInitializeCommands();
                 _childProcessHandler?.Enable();
 
@@ -620,6 +619,8 @@ namespace Microsoft.MIDebugEngine
                 }
                 // now the exe is loaded and we can check target features
                 TargetFeatures = await MICommandFactory.GetTargetFeatures();
+                if (TargetFeatures.Contains("async"))
+                    await MICommandFactory.EnableTargetAsyncOption();
 
                 success = true;
             }
