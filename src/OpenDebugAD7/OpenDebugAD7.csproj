@@ -80,6 +80,9 @@
     <PackageReference Include="Microsoft.VisualStudio.Shared.VSCodeDebugProtocol" Version="$(Microsoft_VisualStudio_Shared_VSCodeDebugProtocol_Version)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(Newtonsoft_Json_VSCode_Version)" />
     <PackageReference Include="Microsoft.VisualStudioEng.MicroBuild.Core" Version="$(Microsoft_VisualStudioEng_MicroBuild_Core_Version)" GeneratePathProperty="true"/>
+    <PackageReference Include="Loyc.Collections" Version="28.2.*" />
+    <PackageReference Include="Loyc.Essentials" Version="28.2.*" />
+    <PackageReference Include="Loyc.Interfaces" Version="28.2.*" />
   </ItemGroup>
   
   <ItemGroup Label="Project References">
