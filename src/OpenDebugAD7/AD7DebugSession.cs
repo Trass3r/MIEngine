@@ -789,6 +789,7 @@ namespace OpenDebugAD7
             InitializeResponse initializeResponse = new InitializeResponse()
             {
                 SupportsConfigurationDoneRequest = true,
+                SupportsCompletionsRequest = true,
                 SupportsEvaluateForHovers = true,
                 SupportsSetVariable = true,
                 SupportsFunctionBreakpoints = m_engineConfiguration.FunctionBP,
@@ -2336,6 +2337,51 @@ namespace OpenDebugAD7
             m_functionBreakpoints = newBreakpoints;
 
             responder.SetResponse(response);
+        }
+
+        protected override void HandleCompletionsRequestAsync(IRequestResponder<CompletionsArguments, CompletionsResponse> responder)
+        {
+            if (!m_isStopped)
+            {
+                responder.SetError(new ProtocolException("Failed to handle CompletionsRequest", new Message(1105, AD7Resources.Error_TargetNotStopped)));
+                return;
+            }
+
+            IDebugStackFrame2 frame = null;
+            int? frameId = responder.Arguments.FrameId;
+            if (frameId != null)
+                _ = m_frameHandles.TryGet(frameId.Value, out frame);
+
+            string command = responder.Arguments.Text;
+            if (command.StartsWith("`", StringComparison.Ordinal))
+                command = command.Substring(1);
+            else if (command.StartsWith("-exec ", StringComparison.Ordinal))
+                command = command.Substring(6);
+            try
+            {
+                MethodInfo methodInfo = m_program.GetType().GetMethod("AutoComplete");
+                string[] results = (string[])methodInfo.Invoke(m_program, new object[] { command, frame });
+                if (results == null)
+                {
+                    responder.SetError(new ProtocolException("Couldn't get results for auto-completion!"));
+                    return;
+                }
+                var matchlist = new List<CompletionItem>();
+                foreach (string result in results)
+                {
+                    matchlist.Add(new CompletionItem(result)
+                    {
+                        Text = "`" + result,
+                        Start = 0,
+                        Length = responder.Arguments.Text.Length
+                    });
+                }
+                responder.SetResponse(new CompletionsResponse(matchlist));
+            }
+            catch (Exception e)
+            {
+                responder.SetError(new ProtocolException("Auto-completion failed!", e));
+            }
         }
 
         protected override void HandleEvaluateRequestAsync(IRequestResponder<EvaluateArguments, EvaluateResponse> responder)
