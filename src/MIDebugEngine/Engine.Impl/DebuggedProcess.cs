@@ -431,6 +431,21 @@ namespace Microsoft.MIDebugEngine
                 ThreadCache.ThreadGroupExitedEvent(result.Results.FindString("id"));
             };
 
+            RecordStartedEvent += async delegate (object o, EventArgs args)
+            {
+                var result = args as ResultEventArgs;
+                string threadGroup = result.Results.FindString("thread-group"); // e.g. "i1"
+                string method = result.Results.FindString("method"); // e.g. "full"
+                await UpdateTargetFeatures();
+            };
+
+            RecordStoppedEvent += async delegate (object o, EventArgs args)
+            {
+                var result = args as ResultEventArgs;
+                string threadGroup = result.Results.FindString("thread-group"); // e.g. "i1"
+                await UpdateTargetFeatures();
+            };
+
             TelemetryEvent += (object o, ResultEventArgs args) =>
             {
                 string eventName;
@@ -538,6 +553,11 @@ namespace Microsoft.MIDebugEngine
             }
         }
 
+        private async Task UpdateTargetFeatures()
+        {
+            TargetFeatures = await MICommandFactory.GetTargetFeatures();
+        }
+
         public async Task Initialize(HostWaitLoop waitLoop, CancellationToken token)
         {
             bool success = false;
@@ -596,7 +616,7 @@ namespace Microsoft.MIDebugEngine
                     }
                 }
                 // now the exe is loaded and we can check target features
-                TargetFeatures = await MICommandFactory.GetTargetFeatures();
+                await UpdateTargetFeatures();
 
                 success = true;
             }
