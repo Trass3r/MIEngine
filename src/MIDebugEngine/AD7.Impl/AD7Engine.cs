@@ -182,27 +182,6 @@ namespace Microsoft.MIDebugEngine
             return _configStore.GetEngineMetric(metric);
         }
 
-        public string[] AutoComplete(string command, IDebugStackFrame2 stackFrame)
-        {
-            string[] result = null;
-            var frame = stackFrame as AD7StackFrame;
-            int threadId = frame?.Thread.Id ?? -1;
-            uint frameLevel = frame?.ThreadContext.Level ?? 0;
-            try
-            {
-                _debuggedProcess.WorkerThread.RunOperation(async () =>
-                {
-                    result = await _debuggedProcess.MICommandFactory.AutoComplete(command, threadId, frameLevel);
-                });
-            }
-            catch (Exception e)
-            {
-                _engineCallback.OnError(EngineUtils.GetExceptionDescription(e));
-            }
-
-            return result;
-        }
-
         #region IDebugEngine2 Members
 
         // Attach the debug engine to a program.
@@ -1170,6 +1149,30 @@ namespace Microsoft.MIDebugEngine
                 hr = Constants.S_OK;
             }
             return hr;
+        }
+
+        int IDebugProgramDAP.AutoCompleteCommand(string command, IDebugStackFrame2 stackFrame, out string[] result)
+        {
+            var frame = stackFrame as AD7StackFrame;
+            int threadId = frame?.Thread.Id ?? -1;
+            uint frameLevel = frame?.ThreadContext.Level ?? 0;
+            try
+            {
+                string[] matches = null;
+                _debuggedProcess.WorkerThread.RunOperation(async () =>
+                {
+                    matches = await _debuggedProcess.MICommandFactory.AutoComplete(command, threadId, frameLevel);
+                });
+                result = matches;
+                return Constants.S_OK;
+            }
+            catch (Exception e)
+            {
+                _engineCallback.OnError(EngineUtils.GetExceptionDescription(e));
+            }
+
+            result = null;
+            return Constants.E_FAIL;
         }
         #endregion
 

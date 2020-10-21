@@ -789,7 +789,7 @@ namespace OpenDebugAD7
             InitializeResponse initializeResponse = new InitializeResponse()
             {
                 SupportsConfigurationDoneRequest = true,
-                SupportsCompletionsRequest = true,
+                SupportsCompletionsRequest = m_engine is IDebugProgramDAP,
                 SupportsEvaluateForHovers = true,
                 SupportsSetVariable = true,
                 SupportsFunctionBreakpoints = m_engineConfiguration.FunctionBP,
@@ -2359,9 +2359,8 @@ namespace OpenDebugAD7
                 command = command.Substring(6);
             try
             {
-                MethodInfo methodInfo = m_program.GetType().GetMethod("AutoComplete");
-                string[] results = (string[])methodInfo.Invoke(m_program, new object[] { command, frame });
-                if (results == null)
+                var debugProgram = (IDebugProgramDAP)m_engine;
+                if (debugProgram.AutoCompleteCommand(command, frame, out string[] results) != HRConstants.S_OK)
                 {
                     responder.SetError(new ProtocolException("Couldn't get results for auto-completion!"));
                     return;
