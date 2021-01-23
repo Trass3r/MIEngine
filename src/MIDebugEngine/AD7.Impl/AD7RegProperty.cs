@@ -9,7 +9,7 @@ using System.Diagnostics;
 
 namespace Microsoft.MIDebugEngine
 {
-    public class AD7RegGroupProperty : IDebugProperty2
+    public sealed class AD7RegGroupProperty : IDebugProperty2
     {
         private readonly AD7Engine _engine;
         private readonly RegisterGroup _group;
@@ -72,7 +72,6 @@ namespace Microsoft.MIDebugEngine
                     }
                     if ((dwFields & enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_ATTRIB) != 0)
                     {
-                        properties[i].dwAttrib = enum_DBG_ATTRIB_FLAGS.DBG_ATTRIB_VALUE_READONLY;
                         properties[i].dwFields |= enum_DEBUGPROP_INFO_FLAGS.DEBUGPROP_INFO_ATTRIB;
                     }
                     i++;
