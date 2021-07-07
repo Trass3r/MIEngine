@@ -1807,6 +1807,7 @@ namespace OpenDebugAD7
                 uint nProps;
                 while (varEnum.Next(1, props, out nProps) == HRConstants.S_OK)
                 {
+                    m_logger.WriteLine(LoggingCategory.DebuggerStatus, props[0].bstrName);
                     if (props[0].bstrName == name)
                     {
                         // Make sure we can assign to this variable.
